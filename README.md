@@ -13,10 +13,10 @@ A Discord bot that helps manage whitelisting for your server.
 1. Clone this repository to your local machine
 2. Install the required dependencies using `pip install -r requirements.txt`
 3. Create a new Discord bot on the Discord Developer Portal and obtain a bot token
-4. Replace the `TOKEN` variable in `bot.py` with your bot token
+4. Replace the `TOKEN` variable in `.env` with your bot token
 5. Replace the following IDs in the code with your own IDs:
-	* `whitelist_role_id` in `source/modules/whitelist.py` with the ID of the role that you want to assign to whitelisted members
-	* `whitelist_channel` in `source/modules/whitelist.py` with the ID of the channel where you want to send review embeds
+	* `whitelist_role_id` in [source/modules/whitelist.py](cci:7://file:///c:/Users/vorlie/Documents/Projects/whitelistbot/source/modules/whitelist.py:0:0-0:0) with the ID of the role that you want to assign to whitelisted members
+	* `whitelist_channel` in [source/modules/whitelist.py](cci:7://file:///c:/Users/vorlie/Documents/Projects/whitelistbot/source/modules/whitelist.py:0:0-0:0) with the ID of the channel where you want to send review embeds
 	* `owner_id` in `bot.py` with your own Discord ID
 6. Run the bot using `python bot.py`
 
@@ -27,5 +27,3 @@ Make sure to replace the IDs in the code with your own IDs, as mentioned above. 
 **Note**
 
 This bot uses a simple JSON file to store whitelist data. This file is not encrypted, so you should not use this bot to store sensitive information.
-
-I hope this helps! Let me know if you have any questions or need further assistance.
