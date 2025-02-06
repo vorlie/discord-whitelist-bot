@@ -12,6 +12,7 @@ A Discord bot that helps manage whitelisting for your server.
 
 1. Clone this repository to your local machine
 2. Install the required dependencies using `pip install -r requirements.txt`
+   - You may need to install python in order to use pip
 3. Create a new Discord bot on the Discord Developer Portal and obtain a bot token
 4. Replace the `TOKEN` variable in `.env` with your bot token
 5. Replace the following IDs in the code with your own IDs:
