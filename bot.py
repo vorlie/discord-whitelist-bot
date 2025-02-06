@@ -39,7 +39,7 @@ class Client(commands.AutoShardedBot):
 intents = discord.Intents.all()
 client = Client(intents=intents)
 client.remove_command("help")
-owner_id = os.getenv("OWNER_ID")
+owner_id = 614807913302851594 # Replace with your ID
 
 with open('config/load.json', 'r') as file:
     load_data = json.load(file)

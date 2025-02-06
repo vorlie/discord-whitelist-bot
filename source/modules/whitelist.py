@@ -1,10 +1,7 @@
-import discord, json, os
+import discord, json
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button
-
-from dotenv import load_dotenv
-load_dotenv()
 
 class ReviewButton(Button):
     def __init__(self, label, style, custom_id, member):
@@ -38,8 +35,8 @@ class ReviewView(View):
 class Whitelist(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.whitelist_role_id = os.getenv("WHITELIST_ROLE")
-        self.whitelist_channel = os.getenv("WHITELIST_CHANNEL")
+        self.whitelist_role_id = 1336950517099790389 # Replace with your role ID
+        self.whitelist_channel = 1336950948182097971 # Replace with your whitelist feed channel ID
         self.whitelist_log_file = "whitelist_log.json"
 
     whitelist_group = app_commands.Group(name="whitelist", description="Manage the whitelist")
