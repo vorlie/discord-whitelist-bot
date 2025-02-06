@@ -1,0 +1,8 @@
+{
+    "modules":[
+        {
+            "name":"whitelist",
+            "load_path":"source.modules.whitelist"
+        }
+    ]   
+}
