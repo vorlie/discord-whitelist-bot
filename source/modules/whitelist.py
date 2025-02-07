@@ -18,9 +18,10 @@ logging.basicConfig(
 class ReviewButton(Button):
     # __init__:  Initializes the button with a label, style, custom ID, and the
     # member it's associated with.
-    def __init__(self, label, style, custom_id, member):
+    def __init__(self, label, style, custom_id, member, silent=False):
         super().__init__(label=label, style=style, custom_id=custom_id)
         self.member = member  # The Discord member this button is for.
+        self.silent = silent
 
     # callback:  This is the function that's called when the button is pressed.
     # It checks the custom ID to determine whether to accept or deny the user.
@@ -36,6 +37,10 @@ class ReviewButton(Button):
             # the Whitelist cog.
             elif self.custom_id == "deny":
                 await self.view.cog.deny_user(interaction, self.member, self.view)
+            # If the button is the "deny_silent" button, call the deny_user method
+            # with the silent flag set to True.
+            elif self.custom_id == "deny_silent":
+                await self.view.cog.deny_user(interaction, self.member, self.view, silent=True)
         except discord.errors.NotFound:
             logging.exception(
                 "Webhook expired during button callback.  Unable to send followup."
