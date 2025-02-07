@@ -47,11 +47,9 @@ with open('config/load.json', 'r') as file:
 @client.command()
 async def dev(ctx, *args):
     if ctx.author.id != owner_id:
-        
         return
 
     if not args:
-        
         await ctx.send("Invalid usage. Please provide at least one argument.")
         return
 

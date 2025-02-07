@@ -57,7 +57,15 @@ class ReviewView(View):
         self.add_item(
             ReviewButton("Accept", discord.ButtonStyle.green, "accept", member)
         )
-        self.add_item(ReviewButton("Deny", discord.ButtonStyle.red, "deny", member))
+        self.add_item(
+            ReviewButton(
+                "Deny", discord.ButtonStyle.red, "deny", member)
+        ) # Regular Deny (with DM)
+        self.add_item(
+            ReviewButton(
+                "Silent Deny", discord.ButtonStyle.grey, "deny_silent", member, silent=True
+            )
+        )  # Silent Deny (no DM)
 
 
 # Whitelist Class:  This is the main cog that handles the whitelist functionality.
@@ -86,46 +94,51 @@ class Whitelist(commands.Cog):
     # server.  It attempts to send a DM to the user before banning, but proceeds
     # with the ban even if the DM fails (e.g., if the user has DMs disabled).
     async def deny_user(
-        self, interaction: discord.Interaction, user: discord.Member, view: View
+        self,
+        interaction: discord.Interaction,
+        user: discord.Member,
+        view: View,
+        silent: bool = False,
     ):
-        """Denies a user and bans them from the server, even if DMs are closed."""
-        try:
-            await user.send(
-                "You have been denied access to this server. You will be banned shortly."
-            )
-            logging.info(f"Successfully sent DM to user {user.id} before banning.")
-        except discord.Forbidden:
-            # Log a warning if the bot can't send a DM (likely due to the user's
-            # privacy settings).
-            logging.warning(
-                f"Failed to send DM to user {user.id} (DMs closed or user blocked bot), proceeding with ban."
-            )
+        """Denies a user and bans them from the server, with an option to do so silently."""
+        if not silent:
             try:
-                await interaction.followup.send(
-                    f"Failed to send message to {user.mention} (DMs closed). Banning anyway.",
-                    ephemeral=True,
+                await user.send(
+                    "You have been denied access to this server. You will be banned shortly."
                 )
-            except discord.errors.NotFound:
-                logging.exception(
-                    "Webhook expired while sending DM failure message.  Unable to send followup."
+                logging.info(f"Successfully sent DM to user {user.id} before banning.")
+            except discord.Forbidden:
+                # Log a warning if the bot can't send a DM (likely due to the
+                # user's privacy settings).
+                logging.warning(
+                    f"Failed to send DM to user {user.id} (DMs closed or user blocked bot), proceeding with ban."
                 )
-            except Exception as e:
-                logging.exception(f"An unexpected error occurred: {e}")
+                try:
+                    await interaction.followup.send(
+                        f"Failed to send message to {user.mention} (DMs closed). Banning anyway.",
+                        ephemeral=True,
+                    )
+                except discord.errors.NotFound:
+                    logging.exception(
+                        "Webhook expired while sending DM failure message.  Unable to send followup."
+                    )
+                except Exception as e:
+                    logging.exception(f"An unexpected error occurred: {e}")
 
-        except Exception as e:
-            # Log any other exceptions that occur while trying to send the DM.
-            logging.exception(f"Error sending DM to user {user.id}: {e}")
-            try:
-                await interaction.followup.send(
-                    f"An error occurred while trying to message {user.mention}. Banning anyway.",
-                    ephemeral=True,
-                )
-            except discord.errors.NotFound:
-                logging.exception(
-                    "Webhook expired while sending DM failure message.  Unable to send followup."
-                )
             except Exception as e:
-                logging.exception(f"An unexpected error occurred: {e}")
+                # Log any other exceptions that occur while trying to send the DM.
+                logging.exception(f"Error sending DM to user {user.id}: {e}")
+                try:
+                    await interaction.followup.send(
+                        f"An error occurred while trying to message {user.mention}. Banning anyway.",
+                        ephemeral=True,
+                    )
+                except discord.errors.NotFound:
+                    logging.exception(
+                        "Webhook expired while sending DM failure message.  Unable to send followup."
+                    )
+                except Exception as e:
+                    logging.exception(f"An unexpected error occurred: {e}")
 
         # Proceed with the ban regardless of DM status
         try:
@@ -164,19 +177,20 @@ class Whitelist(commands.Cog):
 
         # Edit the original embed to indicate the user was denied and remove the
         # buttons.
-        embed = interaction.message.embeds[0]  # Get the original embed
-        embed.title = "Member Denied"
-        embed.color = discord.Color.red()  # Change the embed color
-        try:
-            await interaction.message.edit(
-                embed=embed, view=None
-            )  # Remove the buttons
-        except discord.errors.NotFound:
-            logging.exception(
-                "Message not found while editing embed.  Likely deleted."
-            )
-        except Exception as e:
-            logging.exception(f"An unexpected error occurred: {e}")
+        if view and interaction.message:  # Check if it's a button interaction
+            embed = interaction.message.embeds[0]  # Get the original embed
+            embed.title = "Member Denied"
+            embed.color = discord.Color.red()  # Change the embed color
+            try:
+                await interaction.message.edit(
+                    embed=embed, view=None
+                )  # Remove the buttons
+            except discord.errors.NotFound:
+                logging.exception(
+                    "Message not found while editing embed.  Likely deleted."
+                )
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
 
     # accept_user: A helper function that accepts a user and adds them to the
     # whitelist role.
@@ -268,14 +282,18 @@ class Whitelist(commands.Cog):
     # by users with administrator permissions.
     @whitelist_group.command(name="deny")
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.describe(silent="Whether to silently deny the user (no DM)")
     async def whitelist_deny(
-        self, interaction: discord.Interaction, user: discord.Member
+        self,
+        interaction: discord.Interaction,
+        user: discord.Member,
+        silent: bool = False,
     ):
         """Deny a user who has joined the server"""
         # Defer the interaction immediately to prevent timeouts.
         await interaction.response.defer(ephemeral=True)
         # Call the deny_user helper function.
-        await self.deny_user(interaction, user, None)  # Pass None for view
+        await self.deny_user(interaction, user, None, silent)
 
     # whitelist_accept: A slash command that accepts a user.  It can only be used
     # by users with administrator permissions.
