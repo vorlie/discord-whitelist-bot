@@ -73,7 +73,7 @@ class Whitelist(commands.Cog):
         # where new member join requests will be sent.
         self.whitelist_channel = 1336950948182097971
         self.whitelist_log_file = (
-            "whitelist_log.json"  # The file where whitelist logs are stored.
+            "config/whitelist_log.json"  # The file where whitelist logs are stored.
         )
 
     # whitelist_group: Creates a slash command group named "whitelist" for
