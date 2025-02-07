@@ -25,14 +25,23 @@ class ReviewButton(Button):
     # callback:  This is the function that's called when the button is pressed.
     # It checks the custom ID to determine whether to accept or deny the user.
     async def callback(self, interaction: discord.Interaction):
-        # If the button is the "accept" button, call the accept_user method from
-        # the Whitelist cog.
-        if self.custom_id == "accept":
-            await self.view.cog.accept_user(interaction, self.member)
-        # If the button is the "deny" button, call the deny_user method from the
-        # Whitelist cog.
-        elif self.custom_id == "deny":
-            await self.view.cog.deny_user(interaction, self.member)
+        # Defer the interaction immediately
+        await interaction.response.defer(ephemeral=True)
+        try:
+            # If the button is the "accept" button, call the accept_user method
+            # from the Whitelist cog.
+            if self.custom_id == "accept":
+                await self.view.cog.accept_user(interaction, self.member, self.view)
+            # If the button is the "deny" button, call the deny_user method from
+            # the Whitelist cog.
+            elif self.custom_id == "deny":
+                await self.view.cog.deny_user(interaction, self.member, self.view)
+        except discord.errors.NotFound:
+            logging.exception(
+                "Webhook expired during button callback.  Unable to send followup."
+            )
+        except Exception as e:
+            logging.exception(f"An unexpected error occurred: {e}")
 
 
 # ReviewView Class: Represents the view containing the Accept and Deny buttons.
@@ -76,7 +85,9 @@ class Whitelist(commands.Cog):
     # deny_user:  A helper function that denies a user and bans them from the
     # server.  It attempts to send a DM to the user before banning, but proceeds
     # with the ban even if the DM fails (e.g., if the user has DMs disabled).
-    async def deny_user(self, interaction: discord.Interaction, user: discord.Member):
+    async def deny_user(
+        self, interaction: discord.Interaction, user: discord.Member, view: View
+    ):
         """Denies a user and bans them from the server, even if DMs are closed."""
         try:
             await user.send(
@@ -89,77 +100,169 @@ class Whitelist(commands.Cog):
             logging.warning(
                 f"Failed to send DM to user {user.id} (DMs closed or user blocked bot), proceeding with ban."
             )
-            await interaction.followup.send(
-                f"Failed to send message to {user.mention} (DMs closed). Banning anyway.",
-                ephemeral=True,
-            )
+            try:
+                await interaction.followup.send(
+                    f"Failed to send message to {user.mention} (DMs closed). Banning anyway.",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logging.exception(
+                    "Webhook expired while sending DM failure message.  Unable to send followup."
+                )
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
+
         except Exception as e:
             # Log any other exceptions that occur while trying to send the DM.
             logging.exception(f"Error sending DM to user {user.id}: {e}")
-            await interaction.followup.send(
-                f"An error occurred while trying to message {user.mention}. Banning anyway.",
-                ephemeral=True,
-            )
+            try:
+                await interaction.followup.send(
+                    f"An error occurred while trying to message {user.mention}. Banning anyway.",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logging.exception(
+                    "Webhook expired while sending DM failure message.  Unable to send followup."
+                )
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
 
         # Proceed with the ban regardless of DM status
         try:
             await user.ban(reason="Denied by admin")
-            await interaction.followup.send(
-                f"Denied {user.mention} and banned from the server", ephemeral=True
-            )
             logging.info(f"Successfully banned user {user.id}.")
         except discord.Forbidden:
             # Log an error if the bot doesn't have permission to ban the user.
             logging.error(f"Failed to ban user {user.id}")
-            await interaction.followup.send(
-                f"Failed to ban {user.mention}. Insufficient permissions.", ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    f"Failed to ban {user.mention}. Insufficient permissions.",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logging.exception(
+                    "Webhook expired while sending ban failure message.  Unable to send followup."
+                )
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
+            return  # Important: Exit if ban fails
         except Exception as e:
             # Log any other exceptions that occur while trying to ban the user.
             logging.exception(f"Error banning user {user.id}: {e}")
-            await interaction.followup.send(
-                f"An error occurred while trying to ban {user.mention}.", ephemeral=True
+            try:
+                await interaction.followup.send(
+                    f"An error occurred while trying to ban {user.mention}.",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logging.exception(
+                    "Webhook expired while sending ban failure message.  Unable to send followup."
+                )
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
+            return  # Important: Exit if ban fails
+
+        # Edit the original embed to indicate the user was denied and remove the
+        # buttons.
+        embed = interaction.message.embeds[0]  # Get the original embed
+        embed.title = "Member Denied"
+        embed.color = discord.Color.red()  # Change the embed color
+        try:
+            await interaction.message.edit(
+                embed=embed, view=None
+            )  # Remove the buttons
+        except discord.errors.NotFound:
+            logging.exception(
+                "Message not found while editing embed.  Likely deleted."
             )
+        except Exception as e:
+            logging.exception(f"An unexpected error occurred: {e}")
 
     # accept_user: A helper function that accepts a user and adds them to the
     # whitelist role.
-    async def accept_user(self, interaction: discord.Interaction, user: discord.Member):
+    async def accept_user(
+        self, interaction: discord.Interaction, user: discord.Member, view: View
+    ):
         """Accepts a user and adds them to the whitelist."""
         whitelist_role = interaction.guild.get_role(self.whitelist_role_id)
         # Check if the whitelist role exists.
         if not whitelist_role:
-            await interaction.followup.send(
-                "Whitelist role not found.  Check configuration.", ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "Whitelist role not found.  Check configuration.", ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logging.exception(
+                    "Webhook expired while sending role not found message.  Unable to send followup."
+                )
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
             return
 
         # Check if the user already has the whitelist role.
         if whitelist_role in user.roles:
-            await interaction.followup.send(
-                f"{user.mention} is already in the whitelist", ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    f"{user.mention} is already in the whitelist", ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logging.exception(
+                    "Webhook expired while sending already whitelisted message.  Unable to send followup."
+                )
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
             return
 
         try:
             await user.add_roles(whitelist_role)  # Add the whitelist role to the user.
             await self.log_whitelist_user(user)  # Log the whitelisting action.
-            await interaction.followup.send(
-                f"Accepted {user.mention} and added to whitelist", ephemeral=True
-            )
+            logging.info(f"Successfully added role to user {user.id}")
         except discord.Forbidden:
             # Log an error if the bot doesn't have permission to add the role.
             logging.error(f"Failed to add role to user {user.id}")
-            await interaction.followup.send(
-                f"Failed to add whitelist role to {user.mention}. Insufficient permissions.",
-                ephemeral=True,
-            )
+            try:
+                await interaction.followup.send(
+                    f"Failed to add whitelist role to {user.mention}. Insufficient permissions.",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logging.exception(
+                    "Webhook expired while sending permission error message.  Unable to send followup."
+                )
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
+            return  # Exit if adding role fails
         except Exception as e:
             # Log any other exceptions that occur while trying to add the role.
             logging.exception(f"Error adding role to user {user.id}: {e}")
-            await interaction.followup.send(
-                f"An error occurred while trying to add the whitelist role to {user.mention}.",
-                ephemeral=True,
+            try:
+                await interaction.followup.send(
+                    f"An error occurred while trying to add the whitelist role to {user.mention}.",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logging.exception(
+                    "Webhook expired while sending generic error message.  Unable to send followup."
+                )
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
+            return  # Exit if adding role fails
+
+        # Edit the original embed to indicate the user was accepted and remove
+        # the buttons.
+        embed = interaction.message.embeds[0]  # Get the original embed
+        embed.title = "Member Accepted"
+        embed.color = discord.Color.green()  # Change the embed color
+        try:
+            await interaction.message.edit(
+                embed=embed, view=None
+            )  # Remove the buttons
+        except discord.errors.NotFound:
+            logging.exception(
+                "Message not found while editing embed.  Likely deleted."
             )
+        except Exception as e:
+            logging.exception(f"An unexpected error occurred: {e}")
 
     # whitelist_deny: A slash command that denies a user.  It can only be used
     # by users with administrator permissions.
@@ -171,7 +274,8 @@ class Whitelist(commands.Cog):
         """Deny a user who has joined the server"""
         # Defer the interaction immediately to prevent timeouts.
         await interaction.response.defer(ephemeral=True)
-        await self.deny_user(interaction, user)  # Call the deny_user helper function.
+        # Call the deny_user helper function.
+        await self.deny_user(interaction, user, None)  # Pass None for view
 
     # whitelist_accept: A slash command that accepts a user.  It can only be used
     # by users with administrator permissions.
@@ -184,7 +288,7 @@ class Whitelist(commands.Cog):
         # Defer the interaction immediately to prevent timeouts.
         await interaction.response.defer(ephemeral=True)
         # Call the accept_user helper function.
-        await self.accept_user(interaction, user)
+        await self.accept_user(interaction, user, None)  # Pass None for view
 
     # load_whitelist_log: Loads the whitelist log from the JSON file.
     async def load_whitelist_log(self):
@@ -248,6 +352,9 @@ class Whitelist(commands.Cog):
                     await member.add_roles(
                         whitelist_role
                     )  # Add the whitelist role to the user.
+                    member.send(
+                        "You have been automatically whitelisted from a previous join."
+                    )
                     logging.info(
                         f"Automatically whitelisted user {member.id} from log."
                     )
